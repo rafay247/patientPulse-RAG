@@ -1,0 +1,325 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+
+  /* Dark Theme (default) */
+  :root,
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 95%;
+    --primary: 0 0% 85%;
+    --primary-foreground: 0 0% 5%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 20%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 15%;
+    --input: 0 0% 12%;
+    --ring: 0 0% 70%;
+    --radius: 0.75rem;
+  }
+
+  /* Light Theme */
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --primary: 0 0% 15%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 0 0% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* Custom scrollbar - Dark */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 30%);
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: hsl(0 0% 40%);
+}
+
+/* Custom scrollbar - Light */
+.light ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.light ::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 70%);
+  border-radius: 3px;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: hsl(0 0% 60%);
+}
+
+/* Glass effect */
+.glass {
+  background: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(16px);
+  border: 1px solid hsl(var(--border) / 0.6);
+  transition: all 0.3s ease;
+}
+
+/* Gradient text */
+.dark .gradient-text {
+  background: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 60%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.light .gradient-text {
+  background: linear-gradient(135deg, hsl(0 0% 10%), hsl(0 0% 40%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ===== ANIMATIONS ===== */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.scale-in {
+  animation: scale-in 0.3s ease-out;
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.1);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+  }
+}
+
+.dark .pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-light {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.light .pulse-glow {
+  animation: pulse-glow-light 3s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.3);
+    opacity: 0.6;
+  }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.message-in {
+  animation: message-in 0.35s ease-out;
+}
+
+@keyframes loading-dots {
+
+  0%,
+  20% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+}
+
+.loading-dots span:nth-child(1) {
+  animation: loading-dots 1.2s infinite 0s;
+}
+
+.loading-dots span:nth-child(2) {
+  animation: loading-dots 1.2s infinite 0.15s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation: loading-dots 1.2s infinite 0.3s;
+}
+
+/* Hover lift */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dark .hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.light .hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Drop zone */
+.drop-zone {
+  transition: all 0.3s ease;
+}
+
+.dark .drop-zone:hover {
+  border-color: hsl(0 0% 40%);
+  background: hsl(0 0% 8%);
+}
+
+.light .drop-zone:hover {
+  border-color: hsl(0 0% 70%);
+  background: hsl(0 0% 96%);
+}
+
+/* Stagger children */
+.stagger-children>* {
+  animation: slide-up 0.4s ease-out backwards;
+}
+
+.stagger-children>*:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.stagger-children>*:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.stagger-children>*:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.stagger-children>*:nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+.stagger-children>*:nth-child(5) {
+  animation-delay: 0.2s;
+}
