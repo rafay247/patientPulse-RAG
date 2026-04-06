@@ -3,16 +3,13 @@
 import React, { useCallback, useState } from "react";
 import { Upload, FileText, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { processDocument, saveDocumentToStorage, ParsedDocument } from "@/lib/pdfParser";
-import { addDocumentToStore, initializeModel } from "@/lib/vectorStore";
 
 interface DocumentUploadProps {
-    onDocumentAdded: (doc: ParsedDocument) => void;
-    onModelLoading: (loading: boolean, progress?: number) => void;
+    onDocumentAdded: () => void;
+    onUploading: (loading: boolean) => void;
 }
 
-export function DocumentUpload({ onDocumentAdded, onModelLoading }: DocumentUploadProps) {
+export function DocumentUpload({ onDocumentAdded, onUploading }: DocumentUploadProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingStatus, setProcessingStatus] = useState("");
@@ -31,38 +28,31 @@ export function DocumentUpload({ onDocumentAdded, onModelLoading }: DocumentUplo
 
         setError(null);
         setIsProcessing(true);
+        onUploading(true);
 
         try {
-            // Step 1: Initialize model (first time only)
-            setProcessingStatus("Loading AI model...");
-            onModelLoading(true);
-            await initializeModel((progress) => {
-                setProcessingStatus(`Loading AI model... ${Math.round(progress)}%`);
-            });
-            onModelLoading(false);
+            setProcessingStatus("Uploading and processing with LangChain...");
+            const formData = new FormData();
+            formData.append("file", file);
 
-            // Step 2: Extract text from PDF
-            // Step 2: Extract text from document
-            setProcessingStatus("Extracting text from document...");
-            const doc = await processDocument(file);
-
-            // Step 3: Generate embeddings
-            setProcessingStatus("Generating embeddings...");
-            await addDocumentToStore(doc, (current, total) => {
-                setProcessingStatus(`Embedding chunks... ${current}/${total}`);
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                body: formData,
             });
 
-            // Step 4: Save to storage
-            await saveDocumentToStorage(doc);
-            onDocumentAdded(doc);
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Failed to process document");
+            }
 
+            onDocumentAdded();
             setProcessingStatus("");
-        } catch (err) {
+        } catch (err: any) {
             console.error("Processing error:", err);
-            setError(err instanceof Error ? err.message : "Failed to process document");
+            setError(err.message || "Failed to process document");
         } finally {
             setIsProcessing(false);
-            onModelLoading(false);
+            onUploading(false);
         }
     };
 
@@ -96,10 +86,10 @@ export function DocumentUpload({ onDocumentAdded, onModelLoading }: DocumentUplo
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 className={cn(
-                    "drop-zone relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300",
+                    "drop-zone relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 bg-background/50 backdrop-blur-sm",
                     isDragging
                         ? "border-primary bg-primary/5 scale-[1.02]"
-                        : "border-muted-foreground/30 hover:border-primary/50",
+                        : "border-primary/20 hover:border-primary/50",
                     isProcessing && "pointer-events-none opacity-70"
                 )}
             >
@@ -111,11 +101,11 @@ export function DocumentUpload({ onDocumentAdded, onModelLoading }: DocumentUplo
                 ) : (
                     <>
                         <div className="flex flex-col items-center gap-3">
-                            <div className="p-4 rounded-full bg-primary/10">
+                            <div className="p-4 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
                                 <Upload className="h-8 w-8 text-primary" />
                             </div>
                             <div>
-                                <p className="text-lg font-medium">Drop your medical document here</p>
+                                <p className="text-lg font-medium text-foreground">Drop your medical document here</p>
                                 <p className="text-sm text-muted-foreground mt-1">
                                     PDF, PNG, JPG accepted
                                 </p>
@@ -137,7 +127,7 @@ export function DocumentUpload({ onDocumentAdded, onModelLoading }: DocumentUplo
             </div>
 
             {error && (
-                <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20 animate-in slide-in-from-top-2">
                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
                     <span>{error}</span>
                 </div>

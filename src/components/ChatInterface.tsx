@@ -1,19 +1,28 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Sparkles, FileText, Loader2 } from "lucide-react";
+import { Send, Bot, User, Sparkles, Loader2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ChatMessage, exampleQueries, formatContextForPrompt } from "@/lib/ai-config";
-import { searchSimilar } from "@/lib/vectorStore";
+
+interface ChatMessage {
+    role: "user" | "assistant";
+    content: string;
+}
+
+const exampleQueries = [
+    "What was my blood pressure reading?",
+    "Show me my vitamin D levels",
+    "What were my cholesterol numbers?",
+    "Are there any abnormal results?",
+];
 
 interface ChatInterfaceProps {
     hasDocuments: boolean;
-    isModelLoading: boolean;
 }
 
-export function ChatInterface({ hasDocuments, isModelLoading }: ChatInterfaceProps) {
+export function ChatInterface({ hasDocuments }: ChatInterfaceProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -33,68 +42,56 @@ export function ChatInterface({ hasDocuments, isModelLoading }: ChatInterfacePro
         const userMessage: ChatMessage = {
             role: "user",
             content: query,
-            timestamp: new Date().toISOString(),
         };
 
-        setMessages((prev) => [...prev, userMessage]);
+        const currentMessages = [...messages, userMessage];
+        setMessages(currentMessages);
         setInputValue("");
         setIsLoading(true);
 
+        // Add a temporary empty assistant message
+        setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
         try {
-            // Search for relevant chunks
-            const searchResults = await searchSimilar(query, 3);
-            const contextChunks = searchResults.map((r) => ({
-                text: r.chunk.text,
-                documentName: r.chunk.documentName,
-                score: r.score,
-            }));
-
-            const context = formatContextForPrompt(contextChunks);
-
-            // Call API
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    query,
-                    context,
-                    chatHistory: messages.slice(-6),
+                    messages: currentMessages,
                 }),
             });
 
-            let data;
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.includes("application/json")) {
-                data = await response.json();
-            } else {
-                const text = await response.text();
-                // If it's HTML (error page), try to extract message or just show generic error
-                console.error("Non-JSON response:", text);
-                throw new Error(response.statusText || "Server returned a non-JSON response. Check API key configuration.");
-            }
-
             if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || "Failed to get response");
             }
 
-            const assistantMessage: ChatMessage = {
-                role: "assistant",
-                content: data.message,
-                sources: contextChunks.map((c) => ({
-                    documentName: c.documentName,
-                    score: c.score,
-                })),
-                timestamp: new Date().toISOString(),
-            };
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error("No reader stream available!");
 
-            setMessages((prev) => [...prev, assistantMessage]);
-        } catch (error) {
-            const errorMessage: ChatMessage = {
-                role: "assistant",
-                content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`,
-                timestamp: new Date().toISOString(),
-            };
-            setMessages((prev) => [...prev, errorMessage]);
+            const decoder = new TextDecoder("utf-8");
+            let accumulatedMessage = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const textChunk = decoder.decode(value, { stream: true });
+                accumulatedMessage += textChunk;
+
+                setMessages((prev) => {
+                    const newMsgs = [...prev];
+                    newMsgs[newMsgs.length - 1].content = accumulatedMessage;
+                    return newMsgs;
+                });
+            }
+
+        } catch (error: any) {
+            setMessages((prev) => {
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1].content = `Sorry, I encountered an error: ${error.message}`;
+                return newMsgs;
+            });
         } finally {
             setIsLoading(false);
         }
@@ -108,43 +105,48 @@ export function ChatInterface({ hasDocuments, isModelLoading }: ChatInterfacePro
     };
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full bg-card/10 relative">
+            {/* Background elements */}
+            <div className="absolute inset-0 bg-grid-white/[0.02] bg-[length:30px_30px] pointer-events-none" />
+
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 relative z-10 hidden-scrollbar">
                 {messages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                        <div className="p-4 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 mb-4">
-                            <Sparkles className="h-10 w-10 text-primary" />
+                    <div className="h-full flex flex-col items-center justify-center text-center px-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl scale-150 animate-pulse" />
+                            <div className="relative p-5 rounded-full bg-gradient-to-br from-primary/30 to-secondary/30 border border-primary/20 backdrop-blur-md">
+                                <Sparkles className="h-10 w-10 text-primary drop-shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
+                            </div>
                         </div>
-                        <h2 className="text-xl font-semibold mb-2">Ask about your medical documents</h2>
-                        <p className="text-muted-foreground mb-6 max-w-md">
-                            Upload a medical PDF and ask questions. I&apos;ll find relevant information and explain it clearly.
+                        <h2 className="text-2xl font-bold mb-3 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">Ask about your medical documents</h2>
+                        <p className="text-muted-foreground mb-8 max-w-md text-sm leading-relaxed">
+                            Upload a medical PDF and ask questions. I'll use LangChain RAG to find relevant information and explain it clearly.
                         </p>
 
-                        {hasDocuments && (
-                            <div className="w-full max-w-md">
-                                <p className="text-sm text-muted-foreground mb-3">Try these example questions:</p>
-                                <div className="flex flex-wrap gap-2 justify-center">
-                                    {exampleQueries.slice(0, 4).map((query, i) => (
-                                        <Button
-                                            key={i}
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-xs"
-                                            onClick={() => handleSend(query)}
-                                            disabled={isLoading || isModelLoading}
-                                        >
-                                            {query}
-                                        </Button>
-                                    ))}
-                                </div>
+                        <div className="w-full max-w-lg">
+                            <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground/70 mb-4">Try these examples</p>
+                            <div className="flex flex-wrap gap-2.5 justify-center">
+                                {exampleQueries.map((query, i) => (
+                                    <Button
+                                        key={i}
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-xs bg-background/50 hover:bg-primary hover:text-primary-foreground border-border/50 transition-all duration-300 rounded-full hover:scale-105 active:scale-95 shadow-sm"
+                                        onClick={() => handleSend(query)}
+                                        disabled={isLoading || !hasDocuments}
+                                    >
+                                        {query}
+                                    </Button>
+                                ))}
                             </div>
-                        )}
+                        </div>
 
                         {!hasDocuments && (
-                            <p className="text-sm text-muted-foreground">
-                                👈 Start by uploading a PDF document
-                            </p>
+                            <div className="mt-8 flex items-center gap-2 text-sm text-yellow-500/80 bg-yellow-500/10 px-4 py-2 rounded-full border border-yellow-500/20">
+                                <Info className="h-4 w-4" />
+                                <span>Please upload a document to start asking questions</span>
+                            </div>
                         )}
                     </div>
                 ) : (
@@ -152,75 +154,55 @@ export function ChatInterface({ hasDocuments, isModelLoading }: ChatInterfacePro
                         <div
                             key={i}
                             className={cn(
-                                "message-in flex gap-3",
-                                message.role === "user" ? "justify-end" : "justify-start"
+                                "flex gap-4 group animate-in slide-in-from-bottom-2 duration-300",
+                                message.role === "user" ? "flex-row-reverse" : "flex-row"
                             )}
                         >
                             {message.role === "assistant" && (
-                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                                    <Bot className="h-4 w-4 text-white" />
+                                <div className="flex-shrink-0 w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-md">
+                                    <Bot className="h-5 w-5 text-white" />
+                                </div>
+                            )}
+                            {message.role === "user" && (
+                                <div className="flex-shrink-0 w-10 h-10 rounded-2xl bg-accent flex items-center justify-center shadow-md">
+                                    <User className="h-5 w-5 text-accent-foreground" />
                                 </div>
                             )}
                             <div
                                 className={cn(
-                                    "max-w-[80%] rounded-2xl px-4 py-3",
+                                    "max-w-[85%] rounded-2xl px-5 py-4 shadow-sm",
                                     message.role === "user"
-                                        ? "bg-primary text-primary-foreground"
-                                        : "bg-muted"
+                                        ? "bg-primary text-primary-foreground rounded-tr-sm"
+                                        : "bg-background/80 backdrop-blur-md border border-border/40 rounded-tl-sm empty:p-6"
                                 )}
                             >
-                                <div className="whitespace-pre-wrap text-sm">{message.content}</div>
-                                {message.sources && message.sources.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-border/50">
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                            <FileText className="h-3 w-3" />
-                                            <span>Sources:</span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                            {Array.from(new Set(message.sources.map((s) => s.documentName))).map(
-                                                (name, j) => (
-                                                    <span
-                                                        key={j}
-                                                        className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary"
-                                                    >
-                                                        {name}
-                                                    </span>
-                                                )
-                                            )}
-                                        </div>
+                                {message.content ? (
+                                    <div 
+                                        className="whitespace-pre-wrap text-[15px] leading-relaxed prose prose-sm dark:prose-invert max-w-none"
+                                        dangerouslySetInnerHTML={{
+                                            __html: message.content
+                                                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                                                .replace(/\n\n/g, '<br/><br/>')
+                                                .replace(/\n- /g, '<br/>• ') // Simple markdown list
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                        <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                        <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }}></span>
                                     </div>
                                 )}
                             </div>
-                            {message.role === "user" && (
-                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                                    <User className="h-4 w-4 text-white" />
-                                </div>
-                            )}
                         </div>
                     ))
                 )}
-
-                {isLoading && (
-                    <div className="flex gap-3 message-in">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                            <Bot className="h-4 w-4 text-white" />
-                        </div>
-                        <div className="bg-muted rounded-2xl px-4 py-3">
-                            <div className="loading-dots flex gap-1">
-                                <span className="w-2 h-2 rounded-full bg-primary"></span>
-                                <span className="w-2 h-2 rounded-full bg-primary"></span>
-                                <span className="w-2 h-2 rounded-full bg-primary"></span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} className="h-2" />
             </div>
 
             {/* Input Area */}
-            <div className="p-4 border-t border-border bg-card/50">
-                <div className="flex gap-2">
+            <div className="p-4 md:p-6 border-t border-border/50 bg-background/80 backdrop-blur-xl relative z-10">
+                <div className="relative flex items-center shadow-sm">
                     <Input
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
@@ -228,31 +210,24 @@ export function ChatInterface({ hasDocuments, isModelLoading }: ChatInterfacePro
                         placeholder={
                             !hasDocuments
                                 ? "Upload a document first..."
-                                : isModelLoading
-                                    ? "Loading AI model..."
-                                    : "Ask about your medical records..."
+                                : "Ask about your medical records..."
                         }
-                        disabled={!hasDocuments || isLoading || isModelLoading}
-                        className="flex-1"
+                        disabled={!hasDocuments || isLoading}
+                        className="flex-1 pr-14 py-6 text-base rounded-full border-primary/20 focus-visible:ring-primary/30 bg-background"
                     />
                     <Button
                         onClick={() => handleSend(inputValue)}
-                        disabled={!inputValue.trim() || !hasDocuments || isLoading || isModelLoading}
+                        disabled={!inputValue.trim() || !hasDocuments || isLoading}
                         size="icon"
+                        className="absolute right-2 h-10 w-10 rounded-full transition-transform hover:scale-105"
                     >
                         {isLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
-                            <Send className="h-4 w-4" />
+                            <Send className="h-5 w-5 ml-0.5" />
                         )}
                     </Button>
                 </div>
-                {isModelLoading && (
-                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Loading embedding model (first time only)...
-                    </p>
-                )}
             </div>
         </div>
     );

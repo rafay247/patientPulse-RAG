@@ -1,60 +1,50 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Activity, FileText, MessageSquare, Zap, Heart } from "lucide-react";
+import { Activity, FileText, MessageSquare, ShieldCheck, HeartPulse } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { DocumentList } from "@/components/DocumentList";
 import { ChatInterface } from "@/components/ChatInterface";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { getDocumentsFromStorage, ParsedDocument } from "@/lib/pdfParser";
-import { loadVectorStore, getChunkCount } from "@/lib/vectorStore";
+
+export interface DocumentMeta {
+    id: string;
+    filename: string;
+    type: string;
+    size: number;
+    uploadDate: string;
+}
 
 export default function Home() {
-    const [documents, setDocuments] = useState<ParsedDocument[]>([]);
-    const [isModelLoading, setIsModelLoading] = useState(false);
-    const [chunkCount, setChunkCount] = useState(0);
+    const [documents, setDocuments] = useState<DocumentMeta[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
     const [mounted, setMounted] = useState(false);
 
-    // Load documents from storage on mount
+    // Load documents from server on mount
     useEffect(() => {
         setMounted(true);
-        const loadData = async () => {
-            const stored = await getDocumentsFromStorage();
-            setDocuments(stored);
-            await loadVectorStore();
-            setChunkCount(getChunkCount());
-        };
-        loadData();
+        loadDocuments();
     }, []);
 
-    const handleDocumentAdded = (doc: ParsedDocument) => {
-        setDocuments((prev) => [...prev, doc]);
-        setChunkCount(getChunkCount());
+    const loadDocuments = async () => {
+        try {
+            const res = await fetch("/api/documents");
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                setDocuments(data);
+            }
+        } catch (e) {
+            console.error("Failed to load documents", e);
+        }
     };
 
-    const handleDocumentRemoved = async (docId: string) => {
-        setDocuments((prev) => prev.filter((d) => d.id !== docId));
-        // Note: The actual deletion from storage happens in DocumentList
-        // We just update the UI state here
-        // But we re-fetch chunk count after a slight delay to ensure sync inside DocumentList logic completed
-        // Or better, we trust DocumentList to have called the removal functions.
-        // Actually, we can just update the chunk count here?
-        // Ideally handleDocumentRemoved should just update UI.
+    const handleDocumentAdded = () => {
+        loadDocuments();
+    };
 
-        // Let's refactor: The parent (Page) should own the deletion logic if possible 
-        // OR the child calls the deletion and tells parent to update.
-        // DocumentList calls onDocumentRemoved AFTER deletion.
-        // So we just update the chunk count.
-
-        // Since deletion in vectorStore is async, we might need to wait, but onDocumentRemoved is synchronous callback.
-        // We will assume DocumentList handles the async await internally before calling this.
-
-        // Wait, if DocumentList calls onDocumentRemoved AFTER await, then we are good.
-        // If it calls it BEFORE, then getChunkCount might be stale.
-        // Let's check DocumentList.
-
-        setChunkCount(getChunkCount());
+    const handleDocumentRemoved = async () => {
+        loadDocuments();
     };
 
     if (!mounted) {
@@ -66,70 +56,82 @@ export default function Home() {
     }
 
     return (
-        <main className="min-h-screen p-4 md:p-6 lg:p-8 fade-in">
+        <main className="min-h-screen p-4 md:p-6 lg:p-8 fade-in relative overflow-hidden bg-background">
+            {/* Subtle grid + vignette */}
+            <div className="absolute inset-0 pointer-events-none opacity-[0.55] dark:opacity-[0.35]">
+                <div className="absolute inset-0 bg-[radial-gradient(1000px_600px_at_70%_-10%,hsl(var(--primary)/0.18),transparent_55%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(800px_500px_at_-10%_30%,hsl(var(--primary)/0.10),transparent_55%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(0,0,0,0.22))] dark:bg-[linear-gradient(to_bottom,transparent,rgba(0,0,0,0.55))]" />
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.55)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.35)_1px,transparent_1px)] bg-[size:28px_28px] [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_72%)]" />
+            </div>
+
             {/* Header */}
-            <header className="mb-8 slide-up flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-gradient-to-br from-foreground/10 to-foreground/5 border border-foreground/10 pulse-glow">
-                        <Heart className="h-6 w-6" />
+            <header className="mb-8 slide-up flex items-start md:items-center justify-between gap-6 relative z-10">
+                <div className="flex items-start md:items-center gap-4 min-w-0">
+                    <div className="relative">
+                        <div className="h-12 w-12 rounded-2xl vitals-strip noise-surface overflow-hidden flex items-center justify-center">
+                            <HeartPulse className="h-6 w-6 text-primary drop-shadow-[0_0_18px_hsl(var(--primary)/0.25)]" />
+                        </div>
                     </div>
-                    <h1 className="text-2xl md:text-3xl font-bold gradient-text">PatientPulse</h1>
+                    <div className="min-w-0">
+                        <div className="flex items-baseline gap-3 flex-wrap">
+                            <h1 className="text-3xl md:text-4xl font-display leading-none tracking-tight">
+                                PatientPulse
+                            </h1>
+                            <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80">
+                                medical document assistant
+                            </span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/40 px-3 py-1 backdrop-blur-sm">
+                                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                                Source-grounded answers
+                            </span>
+                            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/25 px-3 py-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                LangChain RAG
+                            </span>
+                        </div>
+                    </div>
                 </div>
-                <ThemeToggle />
+                <div className="pt-1">
+                    <ThemeToggle />
+                </div>
             </header>
 
             {/* Main Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-180px)]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-180px)] relative z-10">
                 {/* Left Panel - Documents */}
-                <div className="lg:col-span-1 flex flex-col gap-4 stagger-children">
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <Card className="glass hover-lift">
-                            <CardContent className="p-4 flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/20">
-                                    <FileText className="h-5 w-5 text-sky-500" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">{documents.length}</p>
-                                    <p className="text-xs text-muted-foreground">Documents</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="glass hover-lift">
-                            <CardContent className="p-4 flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                                    <Zap className="h-5 w-5 text-yellow-500" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">{chunkCount}</p>
-                                    <p className="text-xs text-muted-foreground">Embeddings</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
+                <div className="lg:col-span-4 flex flex-col gap-6 stagger-children">
+                    
                     {/* Upload */}
-                    <Card className="glass">
-                        <CardHeader className="pb-3">
+                    <Card className="glass border-border/70 shadow-xl overflow-hidden relative group noise-surface">
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(600px_280px_at_20%_0%,hsl(var(--primary)/0.14),transparent_60%)]" />
+                        <CardHeader className="pb-3 relative z-10">
                             <CardTitle className="text-lg flex items-center gap-2">
                                 <FileText className="h-5 w-5 text-primary" />
                                 Upload Documents
                             </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="relative z-10">
                             <DocumentUpload
                                 onDocumentAdded={handleDocumentAdded}
-                                onModelLoading={setIsModelLoading}
+                                onUploading={setIsUploading}
                             />
                         </CardContent>
                     </Card>
 
                     {/* Document List */}
-                    <Card className="glass flex-1 overflow-hidden">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg">Your Documents</CardTitle>
+                    <Card className="glass shadow-lg flex-1 overflow-hidden flex flex-col border-border/70 noise-surface">
+                        <CardHeader className="pb-3 border-b border-border/60 bg-card/30">
+                            <CardTitle className="text-lg flex justify-between items-center">
+                                <span>Your Documents</span>
+                                <span className="text-[11px] px-2.5 py-1 rounded-full border border-border/70 bg-card/40 text-primary font-medium tracking-wide">
+                                    {documents.length}
+                                </span>
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent className="overflow-y-auto max-h-[300px]">
+                        <CardContent className="overflow-y-auto flex-1 p-0">
                             <DocumentList
                                 documents={documents}
                                 onDocumentRemoved={handleDocumentRemoved}
@@ -139,34 +141,25 @@ export default function Home() {
                 </div>
 
                 {/* Right Panel - Chat */}
-                <Card className="lg:col-span-2 glass flex flex-col overflow-hidden">
-                    <CardHeader className="pb-3 border-b border-border">
+                <Card className="lg:col-span-8 glass shadow-2xl flex flex-col overflow-hidden border-border/70 group noise-surface">
+                    <CardHeader className="pb-3 border-b border-border/60 bg-card/20">
                         <CardTitle className="text-lg flex items-center gap-2">
-                            <MessageSquare className="h-5 w-5 text-primary" />
+                            <MessageSquare className="h-5 w-5 text-secondary" />
                             Ask PatientPulse
-                            {isModelLoading && (
-                                <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-primary pulse-dot"></span>
-                                    Loading AI...
+                            {isUploading && (
+                                <span className="ml-auto flex items-center text-[11px] text-primary bg-card/40 px-3 py-1 rounded-full border border-border/70">
+                                    <Activity className="w-3 h-3 mr-2 animate-spin" /> Indexing document…
                                 </span>
                             )}
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="flex-1 p-0 overflow-hidden">
+                    <CardContent className="flex-1 p-0 overflow-hidden bg-background/50 backdrop-blur-sm">
                         <ChatInterface
                             hasDocuments={documents.length > 0}
-                            isModelLoading={isModelLoading}
                         />
                     </CardContent>
                 </Card>
             </div>
-
-            {/* Footer */}
-            <footer className="mt-6 text-center text-xs text-muted-foreground">
-                <p>
-                    🔒 Your documents are processed locally. Only your questions are sent to Claude AI.
-                </p>
-            </footer>
         </main>
     );
 }

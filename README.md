@@ -1,27 +1,27 @@
-# PatientPulse - AI Medical Document Assistant
+# PatientPulse - AI Medical Document Assistant (LangChain Edition)
 
-PatientPulse is a powerful, privacy-focused RAG (Retrieval-Augmented Generation) application designed to help users understand their medical documents. It allows you to upload medical reports in PDF or image format (PNG, JPG) and ask natural language questions about them.
+PatientPulse is a powerful, privacy-focused RAG (Retrieval-Augmented Generation) application designed to help users understand their medical documents. It allows you to upload medical reports in PDF or image format and ask natural language questions about them.
 
-## 🚀 Key Features
+**We have completely redesigned the architecture to use LangChain at the core!**
 
-- **Multi-Format Support**: Upload PDF documents or medical images (PNG, JPG) for analysis.
-- **Client-Side Processing**:
-  - **OCR**: Uses `Tesseract.js` for text extraction from images directly in the browser.
-  - **PDF Parsing**: Uses `PDF.js` for client-side text extraction.
-  - **Embeddings**: Generates vector embeddings locally using `Transformers.js` (`Xenova/all-MiniLM-L6-v2`).
-- **Privacy Native**: Document text and embeddings are stored locally in your browser's **IndexedDB**. Only the relevant context and your questions are sent to the LLM.
-- **AI Intelligence**: Powered by **Groq** (using `llama-3.3-70b-versatile`) for lightning-fast, accurate responses with source citations.
-- **Modern UI**: Sleek, responsive interface built with Next.js, Tailwind CSS, and Shadcn/UI, featuring dark mode and smooth animations.
+## 🚀 Key Features and Enhancements
+
+- **LangChain Architecture**: We've replaced the bespoke client-side implementations with an industry-standard Next.js Server-Side LangChain pipeline!
+  - Uses `RecursiveCharacterTextSplitter` for precise document chunking.
+  - Uses `MemoryVectorStore` with local persistence for storing embeddings.
+  - Uses `createRetrievalChain` and `createStuffDocumentsChain` for advanced retrieval.
+- **Enhanced UI/UX**: The UI has been completely refreshed to feature a modern, glassmorphic design with subtle animations, a beautiful dark mode, and seamless streaming interactions.
+- **Embeddings**: Generates vector embeddings using `Transformers.js` (`Xenova/all-MiniLM-L6-v2`) via a custom LangChain Embeddings wrapper.
+- **AI Intelligence**: Powered by **Groq** (using `llama-3.3-70b-versatile` via `@langchain/groq`) for lightning-fast responses with context citations.
 
 ## 🛠️ Technology Stack
 
-- **Framework**: [Next.js 14](https://nextjs.org/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **Components**: [Shadcn/UI](https://ui.shadcn.com/)
-- **LLM API**: [Groq SDK](https://console.groq.com/)
-- **ML/Embeddings**: [Transformers.js](https://huggingface.co/docs/transformers.js/)
-- **OCR**: [Tesseract.js](https://tesseract.projectnaptha.com/)
-- **Storage**: [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) (via `idb` library)
+- **Framework**: [Next.js 14](https://nextjs.org/) App Router
+- **AI/RAG Engine**: [LangChain.js](https://js.langchain.com/)
+- **LLM API**: [Groq API](https://console.groq.com/) via `@langchain/groq`
+- **Vector Store**: local `MemoryVectorStore` mapped to a persistent JSON file (`data/vectorstore.json`)
+- **ML/Embeddings**: [Transformers.js](https://huggingface.co/docs/transformers.js/) via `@langchain/core` interfaces.
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) + Shadcn/UI
 
 ## 📋 Prerequisites
 
@@ -56,17 +56,13 @@ Before you begin, ensure you have the following:
 
 ## 📖 How it Works
 
-1. **Upload**: When you upload a file, PatientPulse extracts the text (using PDF.js or Tesseract OCR).
-2. **Chunking**: The text is split into smaller, overlapping sections.
-3. **Embedding**: Each section is converted into a vector embedding locally in your browser.
-4. **Storage**: The chunks and their embeddings are saved to **IndexedDB** for persistence across sessions.
-5. **Retrieval**: When you ask a question, the app generates an embedding for your query and performs a cosine similarity search against your local database.
-6. **Generation**: The top relevant chunks are sent along with your question to the Groq LLM to generate a precise, cited response.
-
-## 🔒 Privacy Note
-
-PatientPulse is built with privacy in mind. Your actual medical documents never leave your browser. Only the specific snippets identified as relevant to your question are transmitted to the LLM API to provide an answer.
+1. **Upload**: You upload a document via the Next.js API route (`/api/upload`), which parses the PDF/Image into raw text (using `pdf-parse` or Tesseract).
+2. **LangChain Ingestion**: The text is passed into `RecursiveCharacterTextSplitter` and mapped to `Document` objects.
+3. **Embedding**: The documents are embedded using our custom `LocalTransformersEmbeddings` class running `@xenova/transformers`.
+4. **Vector DB**: The embeddings are persisted continuously to the server's `.data/vectorstore.json` using LangChain's `MemoryVectorStore`.
+5. **Chat**: Using `/api/chat`, a user's question triggers `createRetrievalChain` to query the Vector Store and generate an answer through `ChatGroq`.
+6. **Streaming**: The response is streamed directly back to the client UI with context citations.
 
 ---
 
-Built for health clarity and data ownership.
+Built for health clarity, powered by LangChain.

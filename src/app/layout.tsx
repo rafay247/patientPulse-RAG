@@ -1,8 +1,17 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const display = Fraunces({
+    subsets: ["latin"],
+    variable: "--font-display",
+});
+
+const sans = IBM_Plex_Sans({
+    subsets: ["latin"],
+    weight: ["400", "500", "600"],
+    variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
     title: "PatientPulse | AI Medical Document Assistant",
@@ -20,7 +29,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" className="dark" suppressHydrationWarning>
-            <body className={inter.className}>
+            <body className={`${display.variable} ${sans.variable} font-sans`}>
                 <div className="min-h-screen bg-background">
                     {children}
                 </div>
