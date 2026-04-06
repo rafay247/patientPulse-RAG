@@ -70,15 +70,15 @@ Context:
             input: currentMessageContent,
         });
 
-        const stream = await llm.stream(formattedMessages);
+        // Use non-streaming invocation to keep types/build stable across LangChain versions.
+        // The client still reads the response body as a stream; it will just arrive in one chunk.
+        const result = await llm.invoke(formattedMessages);
 
         // Manual ReadableStream conversion for Next.js response
         const readableStream = new ReadableStream({
             async start(controller) {
-                for await (const chunk of stream) {
-                    const text = typeof chunk === "string" ? chunk : (chunk?.content ?? "");
-                    if (text) controller.enqueue(new TextEncoder().encode(text));
-                }
+                const content = (result as any)?.content ?? "";
+                if (content) controller.enqueue(new TextEncoder().encode(content));
                 
                 // Extra citation block appended at the end
                 if (contextSources.size > 0) {

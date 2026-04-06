@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ingestDocument, DocumentMeta } from "@/lib/langchain";
-import pdf from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { v4 as uuidv4 } from "uuid";
 
 // We disable body parsing locally to handle streaming standard Next.js approach
@@ -16,8 +16,10 @@ export async function POST(request: Request) {
         let text = "";
 
         if (file.type === "application/pdf") {
-            const data = await pdf(buffer);
-            text = data.text;
+            const parser = new PDFParse({ data: buffer });
+            const result = await parser.getText();
+            await parser.destroy();
+            text = result.text;
         } else if (file.type.startsWith("image/")) {
             // Because Tesseract.js is hard to use perfectly server-side without issues,
             // For images we can use a simpler approach or skip them if it's too much, 
